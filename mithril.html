@@ -1,0 +1,111 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset='utf-8'>
+    <title>Clocks Mithriljs</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="timezone.js"></script>
+    <script src="https://unpkg.com/mithril@1.0.0/mithril.js"></script>
+</head>
+
+<body>
+    
+    <div id="container"></div>
+
+
+    <script>
+        
+    function compute(degrees, startFraction, endFraction) {
+
+        var r = 100;
+        var radians = (degrees - 90) / 180 * Math.PI;
+
+        return {
+            x1: r * startFraction * Math.cos(radians),
+            y1: r * startFraction * Math.sin(radians),
+            x2: r * endFraction * Math.cos(radians),
+            y2: r * endFraction * Math.sin(radians),
+        };
+
+    };
+
+    function makeHand(key, date, startFraction, endFraction) {
+        var f = {
+            hours: date.getHours() * 30,
+            minutes: date.getMinutes() * 6,
+            seconds: date.getSeconds() * 6
+        }
+
+        return Object.assign({
+            class: key
+        }, compute(f[key], startFraction, endFraction));
+    };
+
+    var handsConfig = [{
+            name: "hours",
+            start: 0,
+            end: .55
+        }, {
+            name: "minutes",
+            start: 0,
+            end: .85
+        }, {
+            name: "seconds",
+            start: 0,
+            end: .97
+        }, ];
+
+
+    var Clock = {
+
+        oninit: function (v) {
+            var self = this;
+            self.offset = v.attrs.offset || 0;
+            self.date = v.attrs.date || new Date();
+            self.i = setInterval(function () {
+                self.date = new Date(self.date.getTime() + 1000);
+                m.redraw();
+            }, 1000);
+        },
+
+        view: function() {
+
+            var self = this;
+
+            return m('div.clock', [
+                m('h1', 'MihtrilJS SVG Clock'),
+                m('svg', {
+                    xmlns: "http://www.w3.org/2000/svg",
+                    width: 400,
+                    height: 400,
+                    viewBox: "-110 -110 220 220"
+                }, [
+                    m('circle.watch-border', {
+                        cx: 0,
+                        cy: 0,
+                        r: 100
+                    }),
+                    m('g.hands', handsConfig.map(function(cfg) {
+                        return makeHand(cfg.name, self.date, cfg.start, cfg.end);
+                    }).map(function(line) {
+                        return m('line', line);
+                    })),
+                ]),
+            ]);
+        }
+    };
+
+    // Initializes the projector 
+    m.mount(document.getElementById('container'), {
+        view: function () {
+            return m('div.clocks', TIMEZONES.map(function (timezone) {
+                return m(Clock, {offset: 1});
+            }));
+        }
+    });
+    
+    </script>
+</body>
+
+</html>

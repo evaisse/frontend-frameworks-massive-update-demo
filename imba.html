@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang='en-GB'>
+
+<head>
+    <meta charset='utf-8'>
+    <title>SWAGGER FAST UI</title>
+    <script src="assets/brutusin-json-forms.js"></script>
+    <script src="assets/ractive.js"></script>
+    <link rel="stylesheet" href="assets/brutusin-json-forms.css">
+    <link rel="stylesheet" href="assets/spectre.css" />
+    <link rel="stylesheet" href="assets/style.css" />
+</head>
+
+<body>
+    
+    <!--
+       1. This is the element we'll render our Ractive to.
+  -->
+    <div id="container" class="container grid-960"></div>
+    <!--
+       2. You can load a template in many ways. For convenience, we'll include it in
+       a script tag so that we don't need to mess around with AJAX or multiline strings.
+       Note that we've set the type attribute to 'text/ractive' - though it can be
+       just about anything except 'text/javascript'
+  -->
+    <script id="app-template" type="text/ractive">
+        <h1>
+            Swagger API : <input value="{{ swaggerDef }}" class="swaggerdef-url-input" />
+        </h1> 
+
+        {{#if api}}
+            <input type="search" value="{{ textFilter }}" lazy="100" placeholder="search in {{ api.methods.length }} methods..."> 
+        {{else}}
+            <div class="loading"></div>
+        {{/if}} 
+
+
+        {{#each api.methods:i}}
+        <div class="api card {{ @this.filterText(path, textFilter) }}">
+            <div class="card-header" on-click="@this.toggle('api.methods.' + i + '.deployed')">
+                <h4 class="card-title api-name">
+                <span class="label">{{ verb }}</span>
+                <span>{{ path }}</span>
+            </h4>
+                <h6 class="card-meta">
+                <span>{{ shortdesc }}</span>
+            </h6>
+            </div>
+            {{#if deployed }}
+            <div class="card-body">
+                {{ description }}
+                <div class="form-handler" id="ractive-schema-form{{ i }}"></div>
+
+                {{ @this.requestSchema(., i) }}
+            </div>
+            {{/if}}
+        </div>
+        {{/each}}
+
+    </script>
+
+
+    <script>
+    var swaggerDef = "http://127.0.0.1:8089/apis/swagger-def.v1.7.json";
+
+    var app = new Ractive({
+        el: '#container',
+        template: '#app-template',
+        data: {
+            name: 'world',
+            textFilter: '',
+            api: false,
+            swaggerDef: swaggerDef
+        },
+        /**
+         * [loadApi description]
+         * @return {[type]} [description]
+         */
+        loadApi: function() {
+
+            try {
+                app.set('api', app.parseSwagger(JSON.parse(localStorage.getItem(app.get('swaggerDef')))));
+            } catch (e) {}
+
+            fetch(app.get('swaggerDef')).then(function(res) {
+
+                app.set('updating', false);
+
+                res.json().then(function(json) {
+                    localStorage.setItem(app.get('swaggerDef'), JSON.stringify(json));
+                    api = app.parseSwagger(json);
+                    app.set('api', api);
+                });
+            });
+        },
+        /**
+         * [parseSwagger description]
+         * @param  {[type]} json [description]
+         * @return {[type]}      [description]
+         */
+        parseSwagger: function(json) {
+            var methods = [],
+                api;
+            console.log(json);
+            api = json;
+            Object.keys(api.paths).forEach(function(url) {
+                ['get', 'post', 'put', 'delete'].forEach(function(verb) {
+                    var m = api.paths[url][verb];
+                    if (m) {
+                        m.verb = verb;
+                        m.path = url;
+                        m.key = m.verb + "_" + m.path;
+                        methods.push(m);
+                    }
+                });
+            });
+            api.methods = methods.sort(function(a, b) {
+                if (a.path < b.path) return -1;
+                else if (b.path < a.path) return 1;
+                else return (a.verb < b.verb) ? 1 : -1;
+            });
+            localStorage.setItem(app.get('swaggerDef'), JSON.stringify(json));
+            return api;
+        },
+        /**
+         * [filterText description]
+         * @param  {[type]} haystack [description]
+         * @param  {[type]} needle   [description]
+         * @return {[type]}          [description]
+         */
+        filterText: function(haystack, needle) {
+            return (!needle || haystack.toLowerCase().match(needle.toLowerCase())) ? 'show' : 'hide';
+        },
+        
+        /**
+         * [deploy description]
+         * @param  {[type]} method [description]
+         * @return {[type]}        [description]
+         */
+        deploy: function(method) {
+
+        },
+        /**
+         * [requestSchema description]
+         * @param  {[type]} method [description]
+         * @return {[type]}        [description]
+         */
+        requestSchema: function (method, pos) {
+            try {
+
+                var bf, self = this;
+                
+                method.parameters[0].schema.definitions = this.get('api.definitions');
+                bf = brutusin["json-forms"].create(method.parameters[0].schema);
+                console.log('#ractive-schema-form'+pos, this.find('#ractive-schema-form'+pos));
+
+                setTimeout(function () {
+                    bf.render(self.find('#ractive-schema-form'+pos), {});
+                }, 50);
+
+            } catch (e) {
+                console.error(e, e.stack);
+            }
+
+            return pos;
+        }
+    });
+
+
+    app.loadApi();
+
+
+    window.app = app;
+    </script>
+</body>
+
+</html>
